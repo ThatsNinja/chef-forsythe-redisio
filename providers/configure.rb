@@ -87,34 +87,41 @@ def configure
     descriptors = current['ulimit'] == 0 ? current['maxclients'] + 32 : current['maxclients']
 
     #Manage Redisio Config?
-    if node['redisio']['sentinel']['manage_config'] == true
+    if node['redisio']['sentinel']['manage_config']
       config_action = :create
     else
       config_action = :create_if_missing
     end
 
     recipe_eval do
-      server_name = current['name'] || current['port']
+      if node['redisio']['package_install']
+        server_name = 'redis-server'
+      else
+        server_name = current['name'] || current['port']
+      end
+
       piddir = "#{base_piddir}/#{server_name}"
       aof_file = "#{current['datadir']}/appendonly-#{server_name}.aof"
       rdb_file = "#{current['datadir']}/dump-#{server_name}.rdb"
 
-      #Create the owner of the redis data directory
-      user current['user'] do
-        comment 'Redis service account'
-        supports :manage_home => true
-        home current['homedir']
-        shell current['shell']
-        system current['systemuser']
-        not_if { node['etc']['passwd']["#{current['user']}"] }
-      end
-      #Create the redis configuration directory
-      directory current['configdir'] do
-        owner 'root'
-        group 'root'
-        mode '0755'
-        recursive true
-        action :create
+      unless node['redisio']['package_install']
+        #Create the owner of the redis data directory
+        user current['user'] do
+          comment 'Redis service account'
+          supports :manage_home => true
+          home current['homedir']
+          shell current['shell']
+          system current['systemuser']
+          not_if { node['etc']['passwd']["#{current['user']}"] }
+        end
+        #Create the redis configuration directory
+        directory current['configdir'] do
+          owner 'root'
+          group 'root'
+          mode '0755'
+          recursive true
+          action :create
+        end
       end
       #Create the instance data directory
       directory current['datadir'] do
@@ -175,9 +182,15 @@ def configure
         filehandle_limit descriptors
         only_if { current['ulimit'] }
       end
+
+      if node['redisio']['package_install']
+        conf_filename = "/etc/redis/redis.conf"
+      else
+        conf_filename = "#{current['configdir']}/#{server_name}.conf"
+      end
       
       #Lay down the configuration files for the current instance
-      template "#{current['configdir']}/#{server_name}.conf" do
+      template conf_filename do
         source 'redis.conf.erb'
         cookbook 'redisio'
         owner current['user']
@@ -237,60 +250,63 @@ def configure
           :includes                   => current['includes']
         })
       end
-      #Setup init.d file
 
-      bin_path = node['redisio']['bin_path']
-      bin_path = ::File.join(node['redisio']['install_dir'], 'bin') if node['redisio']['install_dir']
-      template "/etc/init.d/redis#{server_name}" do
-        source 'redis.init.erb'
-        cookbook 'redisio'
-        owner 'root'
-        group 'root'
-        mode '0755'
-        variables({
-          :name => server_name,
-          :bin_path => bin_path,
-          :job_control => node['redisio']['job_control'],
-          :port => current['port'],
-          :address => current['address'],
-          :user => current['user'],
-          :configdir => current['configdir'],
-          :piddir => piddir,
-          :requirepass => current['requirepass'],
-          :shutdown_save => current['shutdown_save'],
-          :platform => node['platform'],
-          :unixsocket => current['unixsocket'],
-          :ulimit => descriptors,
-          :required_start => node['redisio']['init.d']['required_start'].join(" "),
-          :required_stop => node['redisio']['init.d']['required_stop'].join(" ")
+      unless node['redisio']['package_install']
+        #Setup init.d file
+        bin_path = node['redisio']['bin_path']
+        bin_path = ::File.join(node['redisio']['install_dir'], 'bin') if node['redisio']['install_dir']
+        template "/etc/init.d/redis#{server_name}" do
+          source 'redis.init.erb'
+          cookbook 'redisio'
+          owner 'root'
+          group 'root'
+          mode '0755'
+          variables({
+            :name => server_name,
+            :bin_path => bin_path,
+            :job_control => node['redisio']['job_control'],
+            :port => current['port'],
+            :address => current['address'],
+            :user => current['user'],
+            :configdir => current['configdir'],
+            :piddir => piddir,
+            :requirepass => current['requirepass'],
+            :shutdown_save => current['shutdown_save'],
+            :platform => node['platform'],
+            :unixsocket => current['unixsocket'],
+            :ulimit => descriptors,
+            :required_start => node['redisio']['init.d']['required_start'].join(" "),
+            :required_stop => node['redisio']['init.d']['required_stop'].join(" ")
+            })
+          only_if { node['redisio']['job_control'] == 'initd' }
+        end
+        template "/etc/init/redis#{server_name}.conf" do
+          source 'redis.upstart.conf.erb'
+          cookbook 'redisio'
+          owner current['user']
+          group current['group']
+          mode '0644'
+          variables({
+            :name => server_name,
+            :bin_path => bin_path,
+            :job_control => node['redisio']['job_control'],
+            :port => current['port'],
+            :address => current['address'],
+            :user => current['user'],
+            :group => current['group'],
+            :maxclients => current['maxclients'],
+            :requirepass => current['requirepass'],
+            :shutdown_save => current['shutdown_save'],
+            :save => current['save'],
+            :configdir => current['configdir'],
+            :piddir => piddir,
+            :platform => node['platform'],
+            :unixsocket => current['unixsocket']
           })
-        only_if { node['redisio']['job_control'] == 'initd' }
+          only_if { node['redisio']['job_control'] == 'upstart' }
+        end
       end
-      template "/etc/init/redis#{server_name}.conf" do
-        source 'redis.upstart.conf.erb'
-        cookbook 'redisio'
-        owner current['user']
-        group current['group']
-        mode '0644'
-        variables({
-          :name => server_name,
-          :bin_path => bin_path,
-          :job_control => node['redisio']['job_control'],
-          :port => current['port'],
-          :address => current['address'],
-          :user => current['user'],
-          :group => current['group'],
-          :maxclients => current['maxclients'],
-          :requirepass => current['requirepass'],
-          :shutdown_save => current['shutdown_save'],
-          :save => current['save'],
-          :configdir => current['configdir'],
-          :piddir => piddir,
-          :platform => node['platform'],
-          :unixsocket => current['unixsocket']
-        })
-        only_if { node['redisio']['job_control'] == 'upstart' }
-      end
+
     end
   end # servers each loop
 end
