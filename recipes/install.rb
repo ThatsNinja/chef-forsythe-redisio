@@ -17,9 +17,13 @@
 # limitations under the License.
 #
 if node['redisio']['package_install']
-  execute 'redisio_package_install' do
+  execute 'add_ppa_repository' do
     command 'sudo add-apt-repository ppa:chris-lea/redis-server -y'
+  end
+  execute 'redisio_package_install' do
     command 'sudo apt-get update'
+  end
+  execute 'dpkg_config_skip' do
     command 'export DEBIAN_FRONTEND=noninteractive'
   end
   apt_package 'redis-server' do
