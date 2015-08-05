@@ -327,11 +327,8 @@ repl-timeout <%=@repltimeout%>
 # IMPORTANT: Check the BGREWRITEAOF to check how to rewrite the append
 # log file in background when it gets too big.
 
-<%if (@backuptype == 'aof' || @backuptype == 'both')%>
 appendonly yes
-<%else%>
-appendonly no
-<%end%>
+
 # The name of the append only file (default: "appendonly.aof")
 appendfilename appendonly-<%=@name%>.aof
 
