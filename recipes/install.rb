@@ -18,8 +18,9 @@
 #
 if node['redisio']['package_install']
   execute 'redisio_package_install' do
-    command 'sudo add-apt-repository ppa:chris-lea/redis-server'
+    command 'sudo add-apt-repository ppa:chris-lea/redis-server -y'
     command 'sudo apt-get update'
+    command 'export DEBIAN_FRONTEND=noninteractive'
   end
   apt_package 'redis-server' do
     action :upgrade

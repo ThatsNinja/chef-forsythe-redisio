@@ -22,7 +22,11 @@ redis = node['redisio']
 
 redis['servers'].each do |current_server|
   server_name = current_server["name"] || current_server["port"]
-  resource = resources("service[redis#{server_name}]")
+  if node['redisio']['package_install']
+    resource = resources("service[redis-server]")
+  else
+    resource = resources("service[redis#{server_name}]")
+  end
   resource.action Array(resource.action)
   resource.action << :start
   resource.action << :enable
