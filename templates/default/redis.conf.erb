@@ -687,11 +687,9 @@ hz <%= @hz %>
 # big latency spikes.
 aof-rewrite-incremental-fsync <%= @aofrewriteincrementalfsync %>
 
-<%if @clusterenabled == 'yes' %>
 cluster-enabled yes
 cluster-config-file <%= @clusterconfigfile || "nodes-#{@name}.conf" %>
-cluster-node-timeout <%= @clusternodetimeout %>
-<%end%>
+cluster-node-timeout 5
 
 ################################## INCLUDES ###################################
 
