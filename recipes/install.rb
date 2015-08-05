@@ -17,9 +17,10 @@
 # limitations under the License.
 #
 if node['redisio']['package_install']
-  package "redisio_package_name" do
-    package_name node['redisio']['package_name']
-    action :install
+  execute 'redisio_package_install' do
+    command 'sudo add-apt-repository ppa:chris-lea/redis-server'
+    command 'sudo apt-get update'
+    command 'sudo apt-get install redis-server'
   end
 else
   include_recipe 'redisio::_install_prereqs'
