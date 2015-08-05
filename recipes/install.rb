@@ -20,7 +20,9 @@ if node['redisio']['package_install']
   execute 'redisio_package_install' do
     command 'sudo add-apt-repository ppa:chris-lea/redis-server'
     command 'sudo apt-get update'
-    command 'sudo apt-get -y install redis-server'
+  end
+  apt_package 'redis-server' do
+    action :upgrade
   end
 else
   include_recipe 'redisio::_install_prereqs'
